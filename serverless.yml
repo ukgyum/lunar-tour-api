@@ -10,6 +10,14 @@ plugins:
 # serverless-webpack configuration
 # Enable auto-packing of external modules
 custom:
+  stage: ${opt:stage, self:provider.stage}
+  region: ${opt:region, self:provider.region}
+  ListingsDB: ${self:custom.stage}-listings
+  BookingsDB: ${self:custom.stage}-bokkings
+  tableThroughputs:
+    prod: 1
+    default: 1
+  tableThroughput: ${self:custom.tableThroughputs.${self:custom.stage}, self:custom.tagleThroughputs.default}
   serverless-offline:
     port: 4000
   bundle:
@@ -19,7 +27,8 @@ provider:
   name: aws
   runtime: nodejs12.x
   region: us-east-1
-  stage: ${opt:stage, self:provider.stage}
+  stage: dev
+  profile: personalAccount
   TableDB: ${self:custom.stage}-tableDB
   tableThroughputs:
     prod: 1
@@ -31,6 +40,8 @@ provider:
   # commit your env.yml.
   #
   environment:
+    BookingsDB: ${self:custom.BookingsDB}
+    ListingsDB: ${self:custom.ListingsDB}
     name_of_var: ${env:NAME_OF_VAR}
     tableDB: ${self:custom.tableDB}
     account: ${env:ACCOUNT}
@@ -45,9 +56,14 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
+        - dynamodb:GetRecords
+        - dynamodb:GetShardIterator
+        - dynamodb:ListStream
       # Restrict our IAM role permissions to
       # the specific table for the stage
       Resource:
+        - "Fn::GetAtt": [ListingsDB, arn]
+        - "Fn::GetAtt": [BookingsDB, arn]
         - "Fn::GetAtt": [TableDB, Arn]
     # - Effect: "Allow"
     #   Action:
@@ -76,6 +92,8 @@ functions:
           integration: lambda-proxy
 
 resources:
+  - ${file(resources/listing-db.yml)}
+  - ${file(resources/booking-db.yml)}
   - ${file(resources/sqs-queue.yml)}
   - ${file(resources/table.yml)}
   - ${file(resources/s3-bucket.yml)}
